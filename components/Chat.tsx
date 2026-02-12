@@ -56,8 +56,8 @@ export function Chat() {
     setMessages([])
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.hostname
-    const ws = new WebSocket(`${protocol}//${host}:3001`)
+    const host = window.location.host
+    const ws = new WebSocket(`${protocol}//${host}`)
 
     ws.onopen = () => {
       ws.send(
