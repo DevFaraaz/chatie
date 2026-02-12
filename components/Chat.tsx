@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { io } from 'socket.io-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -55,59 +56,61 @@ export function Chat() {
     setCurrentUsername(username)
     setMessages([])
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}`
-    const ws = new WebSocket(wsUrl)
+    const socket = io(window.location.origin, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+    })
 
-    ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          type: 'join',
-          roomId: room,
-          username: username,
-        })
-      )
+    socket.on('connect', () => {
+      socket.emit('join', {
+        roomId: room,
+        username: username,
+      })
       setScreen('chat')
-    }
+    })
 
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data)
-      if (message.type === 'chat') {
-        setMessages((prev) => [...prev, message])
-      } else if (message.type === 'user-joined' || message.type === 'user-left') {
-        setMessages((prev) => [...prev, { type: 'system', message: message.message }])
-      } else if (message.type === 'room-info') {
-        setMemberCount(message.memberCount)
-      }
-    }
+    socket.on('chat', (message) => {
+      setMessages((prev) => [...prev, message])
+    })
 
-    ws.onerror = () => {
-      showToast('Connection error. Please try again.')
-    }
+    socket.on('user-joined', (message) => {
+      setMessages((prev) => [...prev, { type: 'system', message: message.message }])
+    })
 
-    ws.onclose = () => {
+    socket.on('user-left', (message) => {
+      setMessages((prev) => [...prev, { type: 'system', message: message.message }])
+    })
+
+    socket.on('room-info', (data) => {
+      setMemberCount(data.memberCount)
+    })
+
+    socket.on('disconnect', () => {
       showToast('Disconnected from server')
       setScreen('join')
-    }
+    })
 
-    wsRef.current = ws
+    socket.on('error', () => {
+      showToast('Connection error. Please try again.')
+    })
+
+    wsRef.current = socket
   }
 
   const sendMessage = () => {
     const text = messageInput.trim()
     if (!text) return
 
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!wsRef.current || !wsRef.current.connected) {
       showToast('Not connected. Please rejoin.')
       return
     }
 
-    wsRef.current.send(
-      JSON.stringify({
-        type: 'chat',
-        text: text,
-      })
-    )
+    wsRef.current.emit('chat', {
+      text: text,
+    })
 
     setMessageInput('')
   }
@@ -127,7 +130,7 @@ export function Chat() {
 
   const leaveRoom = () => {
     if (wsRef.current) {
-      wsRef.current.close()
+      wsRef.current.disconnect()
     }
     setScreen('join')
     setUsername('')
