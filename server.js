@@ -1,11 +1,20 @@
 const express = require('express')
 const WebSocket = require('ws')
 const http = require('http')
-const path = require('path')
+const { createProxyMiddleware } = require('http-proxy-middleware')
 
 const app = express()
 const server = http.createServer(app)
 const wss = new WebSocket.Server({ server })
+
+// Proxy all HTTP requests to Next.js dev server (port 3000)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(createProxyMiddleware({
+    target: 'http://localhost:3000',
+    changeOrigin: true,
+    ws: false,
+  }))
+}
 
 // Store rooms and their connections
 const rooms = new Map()
