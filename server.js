@@ -15,21 +15,20 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl)
   })
 
-  const wss = new WebSocket.Server({ server })
+  // Create WebSocket server with noServer to manually handle upgrades
+  const wss = new WebSocket.Server({ noServer: true })
 
   // Store rooms and their connections
   const rooms = new Map()
 
-  // Heartbeat to keep connections alive
-  const heartbeat = setInterval(() => {
-    wss.clients.forEach((ws) => {
-      if (ws.isAlive === false) return ws.terminate()
-      ws.isAlive = false
-      ws.ping()
+  // Handle WebSocket upgrade
+  server.on('upgrade', (request, socket, head) => {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      handleConnection(ws, request)
     })
-  }, 30000)
+  })
 
-  wss.on('connection', (ws) => {
+  function handleConnection(ws, request) {
     ws.isAlive = true
     ws.on('pong', () => {
       ws.isAlive = true
@@ -98,7 +97,11 @@ app.prepare().then(() => {
         }
       }
     })
-  })
+
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error)
+    })
+  }
 
   function broadcastToRoom(roomId, message, excludeWs = null) {
     if (rooms.has(roomId)) {
@@ -110,7 +113,21 @@ app.prepare().then(() => {
     }
   }
 
+  // Heartbeat to keep connections alive
+  const heartbeat = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if (ws.isAlive === false) return ws.terminate()
+      ws.isAlive = false
+      ws.ping()
+    })
+  }, 30000)
+
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
+  })
+
+  // Cleanup on shutdown
+  process.on('SIGTERM', () => {
+    clearInterval(heartbeat)
   })
 })
