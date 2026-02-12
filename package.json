@@ -6,7 +6,7 @@
     "dev": "next dev",
     "dev:ws": "node server.js",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js & next start",
+    "start": "NODE_ENV=production concurrently \"node server.js\" \"next start\"",
     "lint": "next lint"
   },
   "dependencies": {
@@ -29,6 +29,7 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
-    "tailwindcss": "^3.3.6"
+    "tailwindcss": "^3.3.6",
+    "concurrently": "^8.2.2"
   }
 }

@@ -1,7 +1,9 @@
 const WebSocket = require('ws')
 const http = require('http')
 
-const PORT = process.env.PORT || 3001
+// WebSocket uses a different port than Next.js
+// Next.js uses PORT (default 3000), WebSocket uses WS_PORT (default 3001)
+const PORT = process.env.WS_PORT || 3001
 
 const server = http.createServer()
 const wss = new WebSocket.Server({ server })

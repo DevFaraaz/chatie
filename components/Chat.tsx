@@ -59,7 +59,7 @@ export function Chat() {
     const isDev = process.env.NODE_ENV === 'development'
     const wsUrl = isDev 
       ? `${protocol}//localhost:3001`
-      : `${protocol}//${window.location.host}`
+      : `${protocol}//${window.location.hostname}:3001`
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {
