@@ -1,92 +1,102 @@
+const { createServer } = require('http')
+const { parse } = require('url')
+const next = require('next')
 const WebSocket = require('ws')
-const http = require('http')
 
-// WebSocket uses a different port than Next.js
-// Next.js uses PORT (default 3000), WebSocket uses WS_PORT (default 3001)
-const PORT = process.env.WS_PORT || 3001
+const dev = process.env.NODE_ENV !== 'production'
+const app = next({ dev })
+const handle = app.getRequestHandler()
 
-const server = http.createServer()
-const wss = new WebSocket.Server({ server })
+const PORT = process.env.PORT || 3000
 
-// Store rooms and their connections
-const rooms = new Map()
+app.prepare().then(() => {
+  const server = createServer((req, res) => {
+    const parsedUrl = parse(req.url, true)
+    handle(req, res, parsedUrl)
+  })
 
-wss.on('connection', (ws) => {
-  let currentRoom = null
-  let username = null
+  const wss = new WebSocket.Server({ server })
 
-  ws.on('message', (data) => {
-    try {
-      const message = JSON.parse(data)
+  // Store rooms and their connections
+  const rooms = new Map()
 
-      if (message.type === 'join') {
-        currentRoom = message.roomId
-        username = message.username
+  wss.on('connection', (ws) => {
+    let currentRoom = null
+    let username = null
 
-        if (!rooms.has(currentRoom)) {
-          rooms.set(currentRoom, new Set())
-        }
-        rooms.get(currentRoom).add(ws)
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data)
 
-        // Notify others in room
-        broadcastToRoom(currentRoom, {
-          type: 'user-joined',
-          username: username,
-          message: `${username} joined the room`,
-        }, ws)
+        if (message.type === 'join') {
+          currentRoom = message.roomId
+          username = message.username
 
-        // Send current room members count
-        ws.send(
-          JSON.stringify({
-            type: 'room-info',
-            roomId: currentRoom,
-            memberCount: rooms.get(currentRoom).size,
-          })
-        )
-      }
+          if (!rooms.has(currentRoom)) {
+            rooms.set(currentRoom, new Set())
+          }
+          rooms.get(currentRoom).add(ws)
 
-      if (message.type === 'chat') {
-        if (currentRoom) {
+          // Notify others in room
           broadcastToRoom(currentRoom, {
-            type: 'chat',
+            type: 'user-joined',
             username: username,
-            text: message.text,
-            timestamp: new Date().toLocaleTimeString(),
-          })
+            message: `${username} joined the room`,
+          }, ws)
+
+          // Send current room members count
+          ws.send(
+            JSON.stringify({
+              type: 'room-info',
+              roomId: currentRoom,
+              memberCount: rooms.get(currentRoom).size,
+            })
+          )
         }
-      }
-    } catch (error) {
-      console.error('Error processing message:', error)
-    }
-  })
 
-  ws.on('close', () => {
-    if (currentRoom && rooms.has(currentRoom)) {
-      rooms.get(currentRoom).delete(ws)
-
-      if (rooms.get(currentRoom).size === 0) {
-        rooms.delete(currentRoom)
-      } else {
-        broadcastToRoom(currentRoom, {
-          type: 'user-left',
-          username: username,
-          message: `${username} left the room`,
-        })
-      }
-    }
-  })
-})
-
-function broadcastToRoom(roomId, message, excludeWs = null) {
-  if (rooms.has(roomId)) {
-    rooms.get(roomId).forEach((client) => {
-      if (client.readyState === WebSocket.OPEN && client !== excludeWs) {
-        client.send(JSON.stringify(message))
+        if (message.type === 'chat') {
+          if (currentRoom) {
+            broadcastToRoom(currentRoom, {
+              type: 'chat',
+              username: username,
+              text: message.text,
+              timestamp: new Date().toLocaleTimeString(),
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error processing message:', error)
       }
     })
-  }
-}
 
-server.listen(PORT, () => {
-  console.log(`WebSocket server running on port ${PORT}`)
+    ws.on('close', () => {
+      if (currentRoom && rooms.has(currentRoom)) {
+        rooms.get(currentRoom).delete(ws)
+
+        if (rooms.get(currentRoom).size === 0) {
+          rooms.delete(currentRoom)
+        } else {
+          broadcastToRoom(currentRoom, {
+            type: 'user-left',
+            username: username,
+            message: `${username} left the room`,
+          })
+        }
+      }
+    })
+  })
+
+  function broadcastToRoom(roomId, message, excludeWs = null) {
+    if (rooms.has(roomId)) {
+      rooms.get(roomId).forEach((client) => {
+        if (client.readyState === WebSocket.OPEN && client !== excludeWs) {
+          client.send(JSON.stringify(message))
+        }
+      })
+    }
+  }
+
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`)
+  })
 })
