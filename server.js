@@ -1,25 +1,10 @@
-const express = require('express')
 const WebSocket = require('ws')
 const http = require('http')
-const path = require('path')
-const { createServer } = require('http')
 
-const app = express()
-const server = http.createServer(app)
+const PORT = process.env.PORT || 3001
+
+const server = http.createServer()
 const wss = new WebSocket.Server({ server })
-
-// Serve Next.js static files
-app.use(express.static(path.join(__dirname, '.next/static'), { maxAge: '1 year', immutable: true }))
-app.use(express.static(path.join(__dirname, 'public')))
-
-// Handle all routes by serving Next.js app
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '.next', 'server', 'pages', req.path + '.html'), (err) => {
-    if (err) {
-      res.status(404).send('Not found')
-    }
-  })
-})
 
 // Store rooms and their connections
 const rooms = new Map()
@@ -100,7 +85,6 @@ function broadcastToRoom(roomId, message, excludeWs = null) {
   }
 }
 
-const PORT = process.env.PORT || 3001
 server.listen(PORT, () => {
-  console.log(`WebSocket server running on http://localhost:${PORT}`)
+  console.log(`WebSocket server running on port ${PORT}`)
 })
