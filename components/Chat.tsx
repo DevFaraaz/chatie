@@ -25,7 +25,7 @@ export function Chat() {
   const [messageInput, setMessageInput] = useState('')
   const [memberCount, setMemberCount] = useState(0)
   const [toast, setToast] = useState('')
-  const wsRef = useRef<WebSocket | null>(null)
+  const wsRef = useRef<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const showToast = (message: string) => {
